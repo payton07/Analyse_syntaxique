@@ -3,8 +3,7 @@ package hai913i.tp1;
 import java.nio.file.Path;
 import java.util.List;
 
-import hai913i.tp1.model.ClassInfo;
-import hai913i.tp1.parse.TreeVisitor;
+import hai913i.tp1.Utils.MainCLI;
 import org.eclipse.jdt.core.compiler.IProblem;
 
 import hai913i.tp1.parse.JdtParser;
@@ -59,22 +58,7 @@ public final class Main {
         // puis calculer les métriques et le graphe d'appel. Gardez cette classe courte: elle lit les
         // arguments et délègue.
 
-        // Affichage de l'AST des fichiers
-        TreeVisitor visitor = new TreeVisitor();
-
-        Path targetFile = (args.length > 1 && !args[1].isBlank()) ? Path.of(args[1]) : null;
-
-        for (ParsedFile file : files) {
-            if (targetFile == null || file.path().getFileName().equals(targetFile)) {
-                file.unit().accept(visitor);
-            }
-        }
-        // Affichage des stats :
-        System.out.println("================================================== \nAffichage des stats globales du projet : \n\n"+visitor.getStats()+"\n\n");
-
-        // Affichage des infos de chaque classe
-        for (ClassInfo info : visitor.getClasses()) {
-            System.out.println(info);
-        }
+        MainCLI cli = new MainCLI(files);
+        cli.start();
     }
 }
