@@ -1,6 +1,7 @@
 package hai913i.tp1.parse;
 
 import hai913i.tp1.model.ClassInfo;
+import hai913i.tp1.model.ProjectStats;
 import org.eclipse.jdt.core.dom.*;
 import hai913i.tp1.model.ClassInfo.FieldInfo;
 import hai913i.tp1.model.ClassInfo.MethodInfo;
@@ -11,22 +12,26 @@ import java.util.List;
 public class TreeVisitor extends ASTVisitor {
     private int depth = 0;
     private final List<ClassInfo> classes = new ArrayList<>();
+    private final ProjectStats stats = new ProjectStats();
     public List<ClassInfo> getClasses() {
         return classes;
+    }
+    public ProjectStats getStats() {
+        return stats;
     }
 
     @Override
     public boolean preVisit2(ASTNode node) {
-        System.out.print("  ".repeat(depth));
-
         String nodeType = ASTNode.nodeClassForType(node.getNodeType()).getSimpleName();
         String details = getNodeDetails(node);
 
-        if (details.isEmpty()) {
-            System.out.println(nodeType);
-        } else {
-            System.out.println(nodeType + " [" + details + "]");
-        }
+        // Affichage de l'arbre :
+//        System.out.print("  ".repeat(depth));
+//        if (details.isEmpty()) {
+//            System.out.println(nodeType);
+//        } else {
+//            System.out.println(nodeType + " [" + details + "]");
+//        }
 
         depth++;
         return true;
@@ -57,16 +62,27 @@ public class TreeVisitor extends ASTVisitor {
         ITypeBinding binding = node.resolveBinding();
 
         // 1. Genre, Nom qualifié et Package
-        info.kind = node.isInterface() ? "Interface" : "Classe";
+        if (node.isInterface()) {
+            info.kind = "Interface";
+            stats.incrementInterfaces();
+        } else {
+            info.kind = "Classe";
+            stats.incrementClasses();
+        }
+
         if (binding != null) {
             info.qualifiedName = binding.getQualifiedName();
             IPackageBinding pkg = binding.getPackage();
             info.packageName = (pkg != null && !pkg.isUnnamed()) ? pkg.getName() : "<default>";
 
             // 2. Superclasse et Interfaces directes (via liaisons)
-            ITypeBinding superType = binding.getSuperclass();
-            if (superType != null) {
-                info.superClass = superType.getQualifiedName();
+            List<String> superclasses = new ArrayList<>();
+            if (binding != null) {
+                ITypeBinding current = binding.getSuperclass();
+                while (current != null && !"java.lang.Object".equals(current.getQualifiedName())) {
+                    superclasses.add(current.getQualifiedName());
+                    current = current.getSuperclass();
+                }
             }
             for (ITypeBinding intf : binding.getInterfaces()) {
                 info.interfaces.add(intf.getQualifiedName());
@@ -78,7 +94,7 @@ public class TreeVisitor extends ASTVisitor {
             info.packageName = cu.getPackage() != null ? cu.getPackage().getName().getFullyQualifiedName() : "<default>";
 
             if (node.getSuperclassType() != null) {
-                info.superClass = node.getSuperclassType().toString();
+                info.superClasses.add(node.getSuperclassType().toString());
             }
             for (Object obj : node.superInterfaceTypes()) {
                 info.interfaces.add(obj.toString());
@@ -100,6 +116,7 @@ public class TreeVisitor extends ASTVisitor {
     // ------------------------------------------------------------------------
     @Override
     public boolean visit(EnumDeclaration node) {
+        stats.incrementEnums();
         ClassInfo info = new ClassInfo();
         ITypeBinding binding = node.resolveBinding();
 
@@ -108,7 +125,7 @@ public class TreeVisitor extends ASTVisitor {
             info.qualifiedName = binding.getQualifiedName();
             IPackageBinding pkg = binding.getPackage();
             info.packageName = (pkg != null && !pkg.isUnnamed()) ? pkg.getName() : "<default>";
-            info.superClass = "java.lang.Enum";
+            info.superClasses.add("java.lang.Enum");
             for (ITypeBinding intf : binding.getInterfaces()) {
                 info.interfaces.add(intf.getQualifiedName());
             }
@@ -116,7 +133,7 @@ public class TreeVisitor extends ASTVisitor {
             info.qualifiedName = node.getName().getFullyQualifiedName();
             CompilationUnit cu = (CompilationUnit) node.getRoot();
             info.packageName = cu.getPackage() != null ? cu.getPackage().getName().getFullyQualifiedName() : "<default>";
-            info.superClass = "Enum";
+            info.superClasses.add("Enum");
             for (Object obj : node.superInterfaceTypes()) {
                 info.interfaces.add(obj.toString());
             }
@@ -141,6 +158,7 @@ public class TreeVisitor extends ASTVisitor {
     // ------------------------------------------------------------------------
     @Override
     public boolean visit(RecordDeclaration node) {
+        stats.incrementRecords();
         ClassInfo info = new ClassInfo();
         ITypeBinding binding = node.resolveBinding();
 
@@ -149,7 +167,7 @@ public class TreeVisitor extends ASTVisitor {
             info.qualifiedName = binding.getQualifiedName();
             IPackageBinding pkg = binding.getPackage();
             info.packageName = (pkg != null && !pkg.isUnnamed()) ? pkg.getName() : "<default>";
-            info.superClass = "java.lang.Record";
+            info.superClasses.add("java.lang.Record");
             for (ITypeBinding intf : binding.getInterfaces()) {
                 info.interfaces.add(intf.getQualifiedName());
             }
@@ -157,7 +175,7 @@ public class TreeVisitor extends ASTVisitor {
             info.qualifiedName = node.getName().getFullyQualifiedName();
             CompilationUnit cu = (CompilationUnit) node.getRoot();
             info.packageName = cu.getPackage() != null ? cu.getPackage().getName().getFullyQualifiedName() : "<default>";
-            info.superClass = "Record";
+            info.superClasses.add("Record");
             for (Object obj : node.superInterfaceTypes()) {
                 info.interfaces.add(obj.toString());
             }
@@ -173,6 +191,24 @@ public class TreeVisitor extends ASTVisitor {
         extractMethods(recordMethods.toArray(new MethodDeclaration[0]), info);
 
         classes.add(info);
+        return super.visit(node);
+    }
+
+    @Override
+    public boolean visit(MethodDeclaration node) {
+        if (node.isConstructor()) {
+            stats.incrementConstructors();
+        } else {
+            stats.incrementMethods();
+        }
+        return super.visit(node);
+    }
+
+    // 5. Attributs (champs de classe)
+    @Override
+    public boolean visit(FieldDeclaration node) {
+        // Une ligne comme "private int x, y, z;" compte pour 3 attributs
+        stats.addAttributes(node.fragments().size());
         return super.visit(node);
     }
 

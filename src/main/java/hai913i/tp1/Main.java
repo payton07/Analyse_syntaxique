@@ -69,6 +69,8 @@ public final class Main {
                 file.unit().accept(visitor);
             }
         }
+        // Affichage des stats :
+        System.out.println("================================================== \nAffichage des stats globales du projet : \n\n"+visitor.getStats()+"\n\n");
 
         // Affichage des infos de chaque classe
         for (ClassInfo info : visitor.getClasses()) {

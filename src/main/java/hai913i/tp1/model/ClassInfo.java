@@ -7,7 +7,7 @@ public class ClassInfo {
     public String qualifiedName;
     public String kind; // Class, Interface, Enum, Record
     public String packageName;
-    public String superClass;
+    public List<String> superClasses = new ArrayList<>();
     public List<String> interfaces = new ArrayList<>();
     public List<FieldInfo> fields = new ArrayList<>();
     public List<MethodInfo> methods = new ArrayList<>();
@@ -39,14 +39,20 @@ public class ClassInfo {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("==================================================\n");
-        sb.append(String.format("%s: %s (package: %s)\n", kind, qualifiedName, packageName));
-        sb.append("Superclasse: ").append(superClass != null ? superClass : "None/Object").append("\n");
-        sb.append("Interfaces directes: ").append(interfaces.isEmpty() ? "None" : String.join(", ", interfaces)).append("\n");
+        sb.append(String.format("%s : %s (package: %s)\n", kind, qualifiedName, packageName));
 
-        sb.append("Attributs (").append(fields.size()).append("):\n");
+        sb.append("Superclasses : ")
+                .append(superClasses.isEmpty() ? "aucune" : String.join(", ", superClasses))
+                .append("\n");
+
+        sb.append("Interfaces directes : ")
+                .append(interfaces.isEmpty() ? "aucune" : String.join(", ", interfaces))
+                .append("\n");
+
+        sb.append("Attributs (").append(fields.size()).append(") :\n");
         for (FieldInfo f : fields) sb.append(f).append("\n");
 
-        sb.append("Méthodes (").append(methods.size()).append("):\n");
+        sb.append("Méthodes (").append(methods.size()).append(") :\n");
         for (MethodInfo m : methods) sb.append(m).append("\n");
 
         return sb.toString();
