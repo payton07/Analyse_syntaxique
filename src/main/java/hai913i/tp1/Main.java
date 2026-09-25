@@ -3,7 +3,7 @@ package hai913i.tp1;
 import java.nio.file.Path;
 import java.util.List;
 
-import hai913i.tp1.Utils.MainCLI;
+import hai913i.tp1.utils.MainCLI;
 import org.eclipse.jdt.core.compiler.IProblem;
 
 import hai913i.tp1.parse.JdtParser;

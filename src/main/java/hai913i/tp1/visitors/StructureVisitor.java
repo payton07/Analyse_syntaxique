@@ -1,4 +1,4 @@
-package hai913i.tp1.Visitors;
+package hai913i.tp1.visitors;
 
 import hai913i.tp1.model.ClassInfo;
 import hai913i.tp1.model.ClassInfo.FieldInfo;
