@@ -1,6 +1,6 @@
 package hai913i.tp1.visitors;
 
-import hai913i.tp1.model.CallSiteInfo;
+import hai913i.tp1.model.infos.CallSiteInfo;
 import hai913i.tp1.utils.MethodSignatureUtil;
 import org.eclipse.jdt.core.dom.*;
 

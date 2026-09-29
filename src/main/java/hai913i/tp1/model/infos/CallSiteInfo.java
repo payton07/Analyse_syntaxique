@@ -1,4 +1,4 @@
-package hai913i.tp1.model;
+package hai913i.tp1.model.infos;
 
 public class CallSiteInfo {
     public String methodName;          // ex: checkOut, add

@@ -1,7 +1,7 @@
 package hai913i.tp1.utils;
 
-import hai913i.tp1.model.CallSiteInfo;
-import hai913i.tp1.model.ClassInfo;
+import hai913i.tp1.model.infos.CallSiteInfo;
+import hai913i.tp1.model.infos.ClassInfo;
 import hai913i.tp1.parse.JdtParser.ParsedFile;
 import hai913i.tp1.visitors.CallExtractorVisitor;
 import hai913i.tp1.visitors.MetricsVisitor;
@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class MainCLI {
 

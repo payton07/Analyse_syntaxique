@@ -1,8 +1,8 @@
 package hai913i.tp1.visitors;
 
-import hai913i.tp1.model.ClassInfo;
-import hai913i.tp1.model.ClassInfo.FieldInfo;
-import hai913i.tp1.model.ClassInfo.MethodInfo;
+import hai913i.tp1.model.infos.ClassInfo;
+import hai913i.tp1.model.infos.ClassInfo.FieldInfo;
+import hai913i.tp1.model.infos.ClassInfo.MethodInfo;
 import org.eclipse.jdt.core.dom.*;
 
 import java.util.ArrayList;
