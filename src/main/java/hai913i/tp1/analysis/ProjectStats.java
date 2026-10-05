@@ -1,4 +1,4 @@
-package hai913i.tp1.model;
+package hai913i.tp1.analysis;
 
 public class ProjectStats {
     private int regularClasses = 0;

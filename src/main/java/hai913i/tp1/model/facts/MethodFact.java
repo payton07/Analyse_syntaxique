@@ -9,6 +9,8 @@ public record MethodFact(
         String declaringType,
         boolean isConstructor,
         int parameterCount,
+        int linesOfCode,       // Nombre de lignes du corps (0 si abstrait/interface)
+        boolean hasBody,       // true si méthode concrète
         List<CallFact> calls
 ) implements Comparable<MethodFact> {
 

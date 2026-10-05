@@ -4,12 +4,14 @@ import java.util.*;
 
 public class ProjectFacts {
 
-    private final Map<String, TypeFact> types;
-    private final Map<String, MethodFact> methods;
+    private final Map<String, TypeFact> types;     // qualifiedName -> TypeFact
+    private final Map<String, MethodFact> methods; // methodKey -> MethodFact
+    private final int totalAppLines;
 
-    public ProjectFacts(Map<String, TypeFact> types, Map<String, MethodFact> methods) {
+    public ProjectFacts(Map<String, TypeFact> types, Map<String, MethodFact> methods, int totalAppLines) {
         this.types = Collections.unmodifiableMap(new TreeMap<>(types));
         this.methods = Collections.unmodifiableMap(new TreeMap<>(methods));
+        this.totalAppLines = totalAppLines;
     }
 
     public Map<String, TypeFact> getTypes() {
@@ -18,6 +20,10 @@ public class ProjectFacts {
 
     public Map<String, MethodFact> getMethods() {
         return methods;
+    }
+
+    public int getTotalAppLines() {
+        return totalAppLines;
     }
 
     public boolean isInternalMethod(String methodKey) {

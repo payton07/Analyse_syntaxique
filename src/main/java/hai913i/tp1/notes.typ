@@ -1,29 +1,29 @@
-Partie A0 : Environnement et validation
-1- verification des version de java et maven
-2- compilation reussie
-3-
-4 - analyse du projet validation :
-resultat :
-    Racine des sources     : /Users/payton/Documents/FAC/M2_GL/Semestre1/Evolution-Restruct/TDS-TPS/TP1/ressources/validation/src
-    Unites de compilation  : 14
-    Erreurs de compilation : 0
+= Partie A0 : Environnement et validation
+== 1- verification des version de java et maven
+== 2- compilation reussie
+== 3-
+== 4 - analyse du projet validation :
+=== resultat :
+        Racine des sources     : /Users/payton/Documents/FAC/M2_GL/Semestre1/Evolution-Restruct/TDS-TPS/TP1/ressources/validation/src
+        Unites de compilation  : 14
+        Erreurs de compilation : 0
 
-Partie A1 : Parcourir AST
-1- Classe visitor crée et nommée TreeVisitor
-2 - Classe => TypeDeclaration
+= Partie A1 : Parcourir AST
+== 1- Classe visitor crée et nommée TreeVisitor
+== 2 - Classe => TypeDeclaration
     Attribut => FieldDeclaration
     Method => MethodDeclaration
     appel => MethodInvocation
 
-3 - Rôle de la valeur de visit(...) => On descend dans l'arbre en focntion de la valeur de visit(...). True => on descend et False => Non on ne descend pas.
+== 3 - Rôle de la valeur de visit(...) => On descend dans l'arbre en focntion de la valeur de visit(...). True => on descend et False => Non on ne descend pas.
 
 
-Partie A2 : Extraire la structure du projet
+= Partie A2 : Extraire la structure du projet
 1 -
 
-Partie A3 : Extraire les appels et le type statique du receveur
+= Partie A3 : Extraire les appels et le type statique du receveur
 
-Partie B1 : Un modèle de faits indépendant de JDT
+= Partie B1 : Un modèle de faits indépendant de JDT
 
 Question 3 : Justification des choix ce representations :
 
@@ -54,3 +54,5 @@ Question 3 : Justification des choix ce representations :
   ),
   caption: [Justification des choix de représentation pour le modèle de faits (B1)]
 )
+
+= Partie B2 :

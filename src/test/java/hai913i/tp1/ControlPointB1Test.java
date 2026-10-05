@@ -54,7 +54,7 @@ class ControlPointB1Test {
             f.unit().accept(callVisitor);
         }
 
-        return FactBuilder.build(structVisitor, callVisitor);
+        return FactBuilder.build(files,structVisitor, callVisitor);
     }
 
     @Test

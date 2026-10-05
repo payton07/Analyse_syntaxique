@@ -1,6 +1,6 @@
 package hai913i.tp1.visitors;
 
-import hai913i.tp1.model.ProjectStats;
+import hai913i.tp1.analysis.ProjectStats;
 import org.eclipse.jdt.core.dom.*;
 
 public class MetricsVisitor extends ASTVisitor {
