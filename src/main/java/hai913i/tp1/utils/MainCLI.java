@@ -1,5 +1,8 @@
 package hai913i.tp1.utils;
 
+import hai913i.tp1.model.facts.CallFact;
+import hai913i.tp1.model.facts.ProjectFacts;
+import hai913i.tp1.model.facts.TypeFact;
 import hai913i.tp1.model.infos.CallSiteInfo;
 import hai913i.tp1.model.infos.ClassInfo;
 import hai913i.tp1.parse.JdtParser.ParsedFile;
@@ -25,13 +28,14 @@ public class MainCLI {
     public void start() {
         boolean running = true;
         while (running) {
-            System.out.println("==================================================");
+            System.out.println("==============================================================");
             System.out.println("1 - Afficher l'arbre AST (A1)");
             System.out.println("2 - Afficher les statistiques / métriques (A2)");
             System.out.println("3 - Afficher la structure détaillée (Classes & membres) (A2)");
             System.out.println("4 - Analyser les appels de méthodes (A3)");
+            System.out.println("5 - Valider le modèle de faits indépendant (B1)");
             System.out.println("Q - Quitter");
-            System.out.println("==================================================");
+            System.out.println("==============================================================");
             System.out.print("Choix : ");
             String choice = scanner.nextLine().trim();
 
@@ -40,6 +44,7 @@ public class MainCLI {
                 case "2" -> showMetrics();
                 case "3" -> showStructure();
                 case "4" -> showCalls();
+                case "5" -> showFacts();
                 case "q", "Q" -> running = false;
                 default -> System.out.println("Option non reconnue.");
             }
@@ -132,9 +137,50 @@ public class MainCLI {
 
         System.out.println("\n--- Résumé A3 ---");
         System.out.println("Total appels     : " + totalCalls);
-        System.out.println("Vers le projet   : " + internalCalls);
+        System.out.println("Vers des méthodes du projet   : " + internalCalls);
         System.out.println("Vers l'extérieur : " + externalCalls);
         System.out.println("Non résolus      : " + unresolvedCalls);
+    }
+
+    private void showFacts() {
+        System.out.println("\nConstruction de la base de faits (FactBuilder)...");
+        StructureVisitor structVisitor = new StructureVisitor();
+        CallExtractorVisitor callVisitor = new CallExtractorVisitor();
+
+        for (ParsedFile f : this.files) {
+            f.unit().accept(structVisitor);
+            f.unit().accept(callVisitor);
+        }
+
+        ProjectFacts facts = FactBuilder.build(structVisitor, callVisitor);
+
+        // Recalcul des métriques A2
+        long interfaces = facts.getTypes().values().stream().filter(TypeFact::isInterface).count();
+        long enums = facts.getTypes().values().stream().filter(TypeFact::isEnum).count();
+        long classes = facts.getTypes().size() - interfaces - enums;
+        int totalMethods = facts.getMethods().size();
+        long constructors = facts.getMethods().values().stream().filter(m -> m.isConstructor()).count();
+        int totalFields = facts.getTypes().values().stream().mapToInt(TypeFact::getFieldCount).sum();
+
+        // Recalcul des métriques A3
+        List<CallFact> allCalls = facts.getAllCalls();
+        long unresolved = allCalls.stream().filter(c -> !c.isResolved()).count();
+        long internal = allCalls.stream().filter(c -> facts.isInternalMethod(c.resolvedTarget())).count();
+        long external = allCalls.size() - internal - unresolved;
+
+        System.out.println("\n================ POINT DE CONTRÔLE B1 ========================");
+        System.out.println("Métriques structurelles (A2 depuis faits) :");
+        System.out.printf("  - Types        : %d (Classes: %d, Interfaces: %d, Enums: %d)%n",
+                facts.getTypes().size(), classes, interfaces, enums);
+        System.out.printf("  - Méthodes     : %d (dont %d constructeurs)%n", totalMethods, constructors);
+        System.out.printf("  - Attributs    : %d%n", totalFields);
+
+        System.out.println("\nMétriques d'appels (A3 depuis faits) :");
+        System.out.printf("  - Total appels : %d%n", allCalls.size());
+        System.out.printf("  - Internes     : %d%n", internal);
+        System.out.printf("  - Externes     : %d%n", external);
+        System.out.printf("  - Non résolus  : %d%n", unresolved);
+        System.out.println("==============================================================");
     }
 
     private List<ParsedFile> filterFiles(String fileName) {
