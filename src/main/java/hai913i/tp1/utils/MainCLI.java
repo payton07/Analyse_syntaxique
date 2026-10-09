@@ -1,5 +1,7 @@
 package hai913i.tp1.utils;
 
+import hai913i.tp1.analysis.CallGraph;
+import hai913i.tp1.analysis.DotExporter;
 import hai913i.tp1.analysis.MetricsService;
 import hai913i.tp1.model.facts.MethodFact;
 import hai913i.tp1.model.facts.ProjectFacts;
@@ -11,6 +13,9 @@ import hai913i.tp1.visitors.CallExtractorVisitor;
 import hai913i.tp1.visitors.MetricsVisitor;
 import hai913i.tp1.visitors.StructureVisitor;
 import hai913i.tp1.visitors.TreeVisitor;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 public class MainCLI {
@@ -33,6 +38,7 @@ public class MainCLI {
             System.out.println("4 - Analyser les appels de méthodes (A3)");
             System.out.println("5 - Valider le modèle de faits indépendant (B1)");
             System.out.println("6 - Calculer les 13 métriques du projet (B2)");
+            System.out.println("7 - Construire et interroger le graphe d'appel (B3)");
             System.out.println("Q - Quitter");
             System.out.println("==================================================");
             System.out.print("Choix : ");
@@ -45,6 +51,7 @@ public class MainCLI {
                 case "4" -> showCalls();
                 case "5" -> showFacts();
                 case "6" -> showB2Metrics();
+                case "7" -> showCallGraph();
                 case "q", "Q" -> running = false;
                 default -> System.out.println("Option non reconnue.");
             }
@@ -119,6 +126,65 @@ public class MainCLI {
         System.out.printf("13. Nombre maximal de paramètres : %d%n", maxParams);
         maxParamMethods.forEach(m -> System.out.printf("     - %s%n", m.methodKey()));
         System.out.println("======================================================");
+    }
+
+    private void showCallGraph() {
+        System.out.print("Ajouter les arcs vers les constructeurs (new, this(...), super(...)) ? [o/N] : ");
+        boolean withConstructorArcs = scanner.nextLine().trim().equalsIgnoreCase("o");
+
+        CallGraph graph = new CallGraph(getOrBuildFacts(), withConstructorArcs);
+        List<CallGraph.Edge> edges = graph.getEdges();
+
+        System.out.println("\n========== GRAPHE D'APPEL (B3) ==========");
+        System.out.printf("Option arcs vers les constructeurs : %s%n", withConstructorArcs ? "oui" : "non");
+        System.out.printf("Nœuds (méthodes du projet) : %d%n", graph.getNodes().size());
+        System.out.printf("Arcs                       : %d%n", edges.size());
+        System.out.printf("Sites d'appel internes     : %d%n", graph.getInternalCallSites());
+        System.out.printf("Appels externes            : %d%n", graph.getExternalCalls());
+        System.out.printf("Appels non résolus         : %d%n", graph.getUnresolvedCalls());
+
+        System.out.println("\nArcs (appelant -> appelée [poids]) :");
+        for (CallGraph.Edge edge : edges) {
+            System.out.printf("  %s -> %s [%d]%n", edge.source(), edge.target(), edge.weight());
+        }
+
+        System.out.print("\nMéthode à interroger (partie de sa clé, ex: Catalog#add) ou [Entrée] pour passer : ");
+        String fragment = scanner.nextLine().trim();
+        if (!fragment.isEmpty()) {
+            showCallersAndCallees(graph, fragment);
+        }
+
+        System.out.print("\nFichier DOT à écrire (ex: callgraph.dot) ou [Entrée] pour ne pas exporter : ");
+        String dotFile = scanner.nextLine().trim();
+        if (!dotFile.isEmpty()) {
+            try {
+                Files.writeString(Path.of(dotFile), DotExporter.export(graph));
+                System.out.println("Graphe écrit dans " + Path.of(dotFile).toAbsolutePath());
+            } catch (IOException e) {
+                System.out.println("Écriture impossible : " + e.getMessage());
+            }
+        }
+    }
+
+    private void showCallersAndCallees(CallGraph graph, String fragment) {
+        List<String> matches = graph.findNodes(fragment);
+        if (matches.isEmpty()) {
+            System.out.println("Aucune méthode du projet ne contient « " + fragment + " ».");
+            return;
+        }
+        for (String method : matches) {
+            System.out.println("\n" + method);
+
+            Map<String, Integer> callees = graph.getCallees(method);
+            System.out.printf("  Appelées (%d) :%n", callees.size());
+            if (callees.isEmpty()) System.out.println("    (aucune)");
+            callees.forEach((callee, weight) -> System.out.printf("    -> %s [%d]%n", callee, weight));
+
+            Map<String, Integer> callers = graph.getCallers(method);
+            System.out.printf("  Appelantes (%d) :%n", callers.size());
+            if (callers.isEmpty()) System.out.println("    (aucune)");
+            callers.forEach((caller, weight) -> System.out.printf("    <- %s [%d]%n", caller, weight));
+        }
     }
 
     private void renderQ12Table(MetricsService service) {

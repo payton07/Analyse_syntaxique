@@ -8,7 +8,12 @@ import java.util.*;
 
 public class CallExtractorVisitor extends ASTVisitor {
 
+    // Appels au sens du § 4.4 : MethodInvocation et SuperMethodInvocation
     private final Map<String, List<CallSiteInfo>> callsByMethod = new LinkedHashMap<>();
+    // Appels de constructeurs (new, this(...), super(...)) : gardés à part, ils ne font pas partie
+    // des appels du § 4.4 et ne servent qu'à l'option « arcs vers les constructeurs » du graphe (B3).
+    private final Map<String, List<CallSiteInfo>> constructorCallsByMethod = new LinkedHashMap<>();
+
     private final Deque<String> currentMethodStack = new ArrayDeque<>();
     private final Deque<ITypeBinding> currentTypeStack = new ArrayDeque<>();
 
@@ -79,6 +84,7 @@ public class CallExtractorVisitor extends ASTVisitor {
         String methodKey = MethodSignatureUtil.getMethodKey(node.resolveBinding());
         currentMethodStack.push(methodKey);
         callsByMethod.putIfAbsent(methodKey, new ArrayList<>());
+        constructorCallsByMethod.putIfAbsent(methodKey, new ArrayList<>());
 
         return super.visit(node);
     }
@@ -92,33 +98,55 @@ public class CallExtractorVisitor extends ASTVisitor {
     }
 
     // ------------------------------------------------------------------------
-    // Invocations
+    // Invocations de méthodes (§ 4.4)
     // ------------------------------------------------------------------------
     @Override
     public boolean visit(MethodInvocation node) {
-        if (currentMethodStack.isEmpty()) {
-            return super.visit(node);
-        }
-        registerCall(node, node.getName(), node.resolveMethodBinding(), resolveReceiver(node));
+        registerCall(callsByMethod, node, node.getName().getIdentifier(),
+                node.resolveMethodBinding(), resolveReceiver(node));
         return super.visit(node);
     }
 
     @Override
     public boolean visit(SuperMethodInvocation node) {
-        if (currentMethodStack.isEmpty()) {
-            return super.visit(node);
-        }
-        ITypeBinding enclosing = currentTypeStack.peek();
-        String receiverType = (enclosing != null && enclosing.getSuperclass() != null)
-                ? getTypeName(enclosing.getSuperclass(), "super")
-                : "super";
+        registerCall(callsByMethod, node, node.getName().getIdentifier(),
+                node.resolveMethodBinding(), superclassOfEnclosingType());
+        return super.visit(node);
+    }
 
-        registerCall(node, node.getName(), node.resolveMethodBinding(), receiverType);
+    // ------------------------------------------------------------------------
+    // Invocations de constructeurs (option du graphe d'appel)
+    // ------------------------------------------------------------------------
+    @Override
+    public boolean visit(ClassInstanceCreation node) {
+        // new T(...) : le « receveur » est le type instancié
+        registerCall(constructorCallsByMethod, node, "<init>", node.resolveConstructorBinding(),
+                getTypeName(node.getType().resolveBinding(), "<type non résolu>"));
+        return super.visit(node);
+    }
+
+    @Override
+    public boolean visit(ConstructorInvocation node) {
+        // this(...) : autre constructeur du type englobant
+        registerCall(constructorCallsByMethod, node, "<init>", node.resolveConstructorBinding(),
+                getTypeName(currentTypeStack.peek(), "this"));
+        return super.visit(node);
+    }
+
+    @Override
+    public boolean visit(SuperConstructorInvocation node) {
+        // super(...) : constructeur de la superclasse directe
+        registerCall(constructorCallsByMethod, node, "<init>", node.resolveConstructorBinding(),
+                superclassOfEnclosingType());
         return super.visit(node);
     }
 
     public Map<String, List<CallSiteInfo>> getCallsByMethod() {
         return callsByMethod;
+    }
+
+    public Map<String, List<CallSiteInfo>> getConstructorCallsByMethod() {
+        return constructorCallsByMethod;
     }
 
     // ------------------------------------------------------------------------
@@ -138,16 +166,25 @@ public class CallExtractorVisitor extends ASTVisitor {
         return getTypeName(currentTypeStack.peek(), "this");
     }
 
-    private void registerCall(ASTNode node, SimpleName name, IMethodBinding binding, String receiverType) {
+    private String superclassOfEnclosingType() {
+        ITypeBinding enclosing = currentTypeStack.peek();
+        return (enclosing != null) ? getTypeName(enclosing.getSuperclass(), "super") : "super";
+    }
+
+    private void registerCall(Map<String, List<CallSiteInfo>> target, ASTNode node, String name,
+                              IMethodBinding binding, String receiverType) {
+        // Hors de toute méthode comptée (initialiseur de champ) : appel ignoré (§ 4.4)
+        if (currentMethodStack.isEmpty()) return;
+
         CompilationUnit cu = (CompilationUnit) node.getRoot();
 
         CallSiteInfo info = new CallSiteInfo();
-        info.methodName = name.getIdentifier();
+        info.methodName = name;
         info.lineNumber = cu.getLineNumber(node.getStartPosition());
         info.receiverStaticType = receiverType;
         info.resolvedTarget = MethodSignatureUtil.getMethodKey(binding);
 
-        callsByMethod.get(currentMethodStack.peek()).add(info);
+        target.get(currentMethodStack.peek()).add(info);
     }
 
     private String getTypeName(ITypeBinding type, String fallback) {

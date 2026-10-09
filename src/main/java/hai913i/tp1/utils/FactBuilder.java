@@ -66,12 +66,9 @@ public final class FactBuilder {
 
         for (Map.Entry<String, List<CallSiteInfo>> entry : rawCallsByMethod.entrySet()) {
             String methodKey = entry.getKey();
-            List<CallFact> calls = new ArrayList<>();
-
-            for (CallSiteInfo raw : entry.getValue()) {
-                calls.add(new CallFact(raw.lineNumber, raw.methodName, raw.receiverStaticType, raw.resolvedTarget));
-            }
-            Collections.sort(calls);
+            List<CallFact> calls = toSortedCallFacts(entry.getValue());
+            List<CallFact> constructorCalls = toSortedCallFacts(
+                    callVisitor.getConstructorCallsByMethod().getOrDefault(methodKey, List.of()));
 
             String declaringType = methodKey.contains("#") ? methodKey.substring(0, methodKey.indexOf('#')) : "";
             String afterHash = methodKey.contains("#") ? methodKey.substring(methodKey.indexOf('#') + 1) : methodKey;
@@ -90,7 +87,8 @@ public final class FactBuilder {
             boolean hasBody = methodHasBody.getOrDefault(methodKey, false);
 
             methodFacts.put(methodKey, new MethodFact(
-                    methodKey, simpleName, declaringType, isConstructor, paramCount, loc, hasBody, calls
+                    methodKey, simpleName, declaringType, isConstructor, paramCount, loc, hasBody,
+                    calls, constructorCalls
             ));
         }
 
@@ -122,5 +120,14 @@ public final class FactBuilder {
         }
 
         return new ProjectFacts(typeFacts, methodFacts, packages, totalAppLines);
+    }
+
+    private static List<CallFact> toSortedCallFacts(List<CallSiteInfo> rawCalls) {
+        List<CallFact> calls = new ArrayList<>();
+        for (CallSiteInfo raw : rawCalls) {
+            calls.add(new CallFact(raw.lineNumber, raw.methodName, raw.receiverStaticType, raw.resolvedTarget));
+        }
+        Collections.sort(calls);
+        return calls;
     }
 }
