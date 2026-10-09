@@ -5,6 +5,7 @@ import hai913i.tp1.model.facts.*;
 import hai913i.tp1.model.infos.ClassInfo;
 import hai913i.tp1.parse.JdtParser.ParsedFile;
 import hai913i.tp1.visitors.CallExtractorVisitor;
+import hai913i.tp1.visitors.CountingRules;
 import hai913i.tp1.visitors.StructureVisitor;
 import org.eclipse.jdt.core.dom.*;
 
@@ -18,13 +19,18 @@ public final class FactBuilder {
                                      StructureVisitor structVisitor,
                                      CallExtractorVisitor callVisitor) {
 
-        // 1. Calcul des LOC par méthode et total app depuis les unités AST
+        // 1. Calcul des LOC par méthode, du total app et des paquetages depuis les unités AST
         Map<String, Integer> methodLocs = new HashMap<>();
         Map<String, Boolean> methodHasBody = new HashMap<>();
+        Set<String> packages = new TreeSet<>();
         int totalAppLines = 0;
 
         for (ParsedFile pf : parsedFiles) {
             CompilationUnit cu = pf.unit();
+            // Un fichier sans déclaration package appartient au paquetage « (défaut) » (§ 4.1)
+            packages.add(cu.getPackage() != null
+                    ? cu.getPackage().getName().getFullyQualifiedName()
+                    : CountingRules.DEFAULT_PACKAGE);
             try {
                 totalAppLines += java.nio.file.Files.readAllLines(pf.path()).size();
             } catch (java.io.IOException e) {
@@ -115,6 +121,6 @@ public final class FactBuilder {
             ));
         }
 
-        return new ProjectFacts(typeFacts, methodFacts, totalAppLines);
+        return new ProjectFacts(typeFacts, methodFacts, packages, totalAppLines);
     }
 }

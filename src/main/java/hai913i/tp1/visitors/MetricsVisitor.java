@@ -12,39 +12,49 @@ public class MetricsVisitor extends ASTVisitor {
 
     @Override
     public boolean visit(TypeDeclaration node) {
-        if (node.isInterface()) {
-            stats.incrementInterfaces();
-        } else {
-            stats.incrementClasses();
+        if (CountingRules.isCountedType(node)) {
+            if (node.isInterface()) {
+                stats.incrementInterfaces();
+            } else {
+                stats.incrementClasses();
+            }
         }
         return super.visit(node);
     }
 
     @Override
     public boolean visit(EnumDeclaration node) {
-        stats.incrementEnums();
+        if (CountingRules.isCountedType(node)) {
+            stats.incrementEnums();
+        }
         return super.visit(node);
     }
 
     @Override
     public boolean visit(RecordDeclaration node) {
-        stats.incrementRecords();
+        if (CountingRules.isCountedType(node)) {
+            stats.incrementRecords();
+        }
         return super.visit(node);
     }
 
     @Override
     public boolean visit(MethodDeclaration node) {
-        if (node.isConstructor()) {
-            stats.incrementConstructors();
-        } else {
-            stats.incrementMethods();
+        if (CountingRules.isCountedMethod(node)) {
+            if (node.isConstructor()) {
+                stats.incrementConstructors();
+            } else {
+                stats.incrementMethods();
+            }
         }
         return super.visit(node);
     }
 
     @Override
     public boolean visit(FieldDeclaration node) {
-        stats.addAttributes(node.fragments().size());
+        if (CountingRules.isCountedField(node)) {
+            stats.addAttributes(node.fragments().size());
+        }
         return super.visit(node);
     }
 }

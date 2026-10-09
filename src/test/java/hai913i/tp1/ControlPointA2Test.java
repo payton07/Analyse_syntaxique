@@ -122,7 +122,7 @@ class ControlPointA2Test {
                 () -> assertEquals("protected", visibilityByField.get("id"), "id doit être protected"),
                 () -> assertEquals("protected", visibilityByField.get("title"), "title doit être protected"),
                 () -> assertEquals("private", visibilityByField.get("borrower"), "borrower doit être private"),
-                () -> assertEquals("package-private", visibilityByField.get("category"), "category doit être package-private")
+                () -> assertEquals("package", visibilityByField.get("category"), "category doit être package")
         );
     }
 

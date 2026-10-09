@@ -15,16 +15,54 @@ public class CallExtractorVisitor extends ASTVisitor {
     // ------------------------------------------------------------------------
     // Types englobants
     // ------------------------------------------------------------------------
+    // Seuls les types comptés (§ 4.1) sont empilés : le type englobant d'un appel écrit dans
+    // une classe locale ou anonyme reste donc le type compté qui la contient.
     @Override
     public boolean visit(TypeDeclaration node) {
-        currentTypeStack.push(node.resolveBinding());
+        enterType(node);
         return super.visit(node);
     }
 
     @Override
     public void endVisit(TypeDeclaration node) {
-        currentTypeStack.pop();
+        leaveType(node);
         super.endVisit(node);
+    }
+
+    @Override
+    public boolean visit(EnumDeclaration node) {
+        enterType(node);
+        return super.visit(node);
+    }
+
+    @Override
+    public void endVisit(EnumDeclaration node) {
+        leaveType(node);
+        super.endVisit(node);
+    }
+
+    @Override
+    public boolean visit(RecordDeclaration node) {
+        enterType(node);
+        return super.visit(node);
+    }
+
+    @Override
+    public void endVisit(RecordDeclaration node) {
+        leaveType(node);
+        super.endVisit(node);
+    }
+
+    private void enterType(AbstractTypeDeclaration node) {
+        if (CountingRules.isCountedType(node)) {
+            currentTypeStack.push(node.resolveBinding());
+        }
+    }
+
+    private void leaveType(AbstractTypeDeclaration node) {
+        if (CountingRules.isCountedType(node)) {
+            currentTypeStack.pop();
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -32,7 +70,9 @@ public class CallExtractorVisitor extends ASTVisitor {
     // ------------------------------------------------------------------------
     @Override
     public boolean visit(MethodDeclaration node) {
-        if (isInsideAnonymousClass(node)) {
+        // Méthode d'une classe anonyme ou locale : ses appels sont attribués
+        // à la méthode comptée qui la contient (§ 4.4).
+        if (!CountingRules.isCountedMethod(node)) {
             return super.visit(node);
         }
 
@@ -45,7 +85,7 @@ public class CallExtractorVisitor extends ASTVisitor {
 
     @Override
     public void endVisit(MethodDeclaration node) {
-        if (!isInsideAnonymousClass(node) && !currentMethodStack.isEmpty()) {
+        if (CountingRules.isCountedMethod(node) && !currentMethodStack.isEmpty()) {
             currentMethodStack.pop();
         }
         super.endVisit(node);
@@ -112,15 +152,5 @@ public class CallExtractorVisitor extends ASTVisitor {
 
     private String getTypeName(ITypeBinding type, String fallback) {
         return (type != null) ? type.getErasure().getQualifiedName() : fallback;
-    }
-
-    private boolean isInsideAnonymousClass(ASTNode node) {
-        ASTNode parent = node.getParent();
-        while (parent != null) {
-            if (parent instanceof AnonymousClassDeclaration) return true;
-            if (parent instanceof TypeDeclaration) return false;
-            parent = parent.getParent();
-        }
-        return false;
     }
 }

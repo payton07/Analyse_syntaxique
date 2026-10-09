@@ -33,11 +33,7 @@ public class MetricsService {
 
     // Q4 : Nombre total de paquetages
     public int getTotalPackages() {
-        return (int) facts.getTypes().values().stream()
-                .map(TypeFact::packageName)
-                .filter(p -> p != null && !p.isEmpty())
-                .distinct()
-                .count();
+        return facts.getPackages().size();
     }
 
     // Q5 : Nombre moyen de méthodes par classe
@@ -109,7 +105,8 @@ public class MetricsService {
                 .toList();
     }
 
-    // Q12 : Pour chaque classe, les 10 % de ses méthodes les plus longues (avec corps > 0)
+    // Q12 : Pour chaque classe, les 10 % de ses méthodes les plus longues.
+    // Les candidats sont toutes les méthodes de la classe (§ 4.3), y compris celles sans corps (0 ligne).
     public Map<String, List<MethodFact>> getTop10PercentMethodsByClass() {
         Map<String, List<MethodFact>> result = new LinkedHashMap<>();
 
@@ -117,26 +114,9 @@ public class MetricsService {
             List<MethodFact> classMethods = type.methodKeys().stream()
                     .map(k -> facts.getMethods().get(k))
                     .filter(Objects::nonNull)
-                    .filter(MethodFact::hasBody)
-                    .filter(m -> m.linesOfCode() > 0)
-                    .collect(Collectors.toList());
-
-            if (classMethods.isEmpty()) {
-                result.put(type.qualifiedName(), List.of());
-                continue;
-            }
-
-            int k = (classMethods.size() + 9) / 10;
-            // Tri décroissant sur LOC, puis nom
-            classMethods.sort(Comparator.comparingInt(MethodFact::linesOfCode).reversed()
-                    .thenComparing(MethodFact::methodKey));
-
-            int thresholdLoc = classMethods.get(k - 1).linesOfCode();
-            List<MethodFact> top = classMethods.stream()
-                    .filter(m -> m.linesOfCode() >= thresholdLoc)
                     .toList();
 
-            result.put(type.qualifiedName(), top);
+            result.put(type.qualifiedName(), getTop10Percent(classMethods, MethodFact::linesOfCode));
         }
 
         return result;
@@ -158,16 +138,19 @@ public class MetricsService {
                 .toList();
     }
 
-    // --- Règle générique du Top 10 % avec k = ceil(N/10) et ex-aequo ---
-    private <T> List<T> getTop10Percent(List<T> list, ToIntFunction<T> metricExtractor) {
-        if (list.isEmpty()) return List.of();
-        int k = (list.size() + 9) / 10;
+    // --- Règle générique du Top 10 % (§ 4.3) : k = ceil(n/10), ex-aequo retenus, 0 jamais retenu ---
+    private <T> List<T> getTop10Percent(List<T> candidates, ToIntFunction<T> metricExtractor) {
+        if (candidates.isEmpty()) return List.of();
+        int k = (candidates.size() + 9) / 10;
 
-        list.sort(Comparator.comparingInt(metricExtractor).reversed());
-        int threshold = metricExtractor.applyAsInt(list.get(k - 1));
+        // Tri stable : à valeur égale, l'ordre (déterministe) des candidats est conservé
+        List<T> sorted = new ArrayList<>(candidates);
+        sorted.sort(Comparator.comparingInt(metricExtractor).reversed());
+        int threshold = metricExtractor.applyAsInt(sorted.get(k - 1));
 
-        return list.stream()
+        return sorted.stream()
                 .filter(item -> metricExtractor.applyAsInt(item) >= threshold)
+                .filter(item -> metricExtractor.applyAsInt(item) > 0)
                 .toList();
     }
 }

@@ -134,15 +134,8 @@ public class MainCLI {
             String className = entry.getKey();
             TypeFact type = entry.getValue();
 
-            // Candidats : méthodes ayant un corps et des lignes > 0
-            List<MethodFact> candidates = type.methodKeys().stream()
-                    .map(k -> f.getMethods().get(k))
-                    .filter(Objects::nonNull)
-                    .filter(MethodFact::hasBody)
-                    .filter(m -> m.linesOfCode() > 0)
-                    .toList();
-
-            int n = candidates.size();
+            // Candidats : toutes les méthodes de la classe (§ 4.3)
+            int n = type.getMethodCount();
             int k = (n + 9) / 10;
             List<MethodFact> tops = topMethodsByClass.getOrDefault(className, List.of());
 
