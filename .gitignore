@@ -17,5 +17,6 @@ Thumbs.db
 __MACOSX/
 
 # Sorties generees par l'analyseur
+*.dot
 *.dot.png
 *.log

@@ -121,3 +121,60 @@ Le test `ControlPointB3Test` vérifie chaque ligne du point de contrôle, la coh
 - Les références de méthode (`Type::m`) ne sont pas des appels (§ 4.4) et ne donnent aucun arc.
 - Avec l'option constructeurs, un `new` vers une classe sans constructeur écrit (constructeur par défaut) ou vers une classe anonyme est compté comme externe : sa cible n'est pas une méthode comptée du projet.
 - Les appels de constructeurs implicites (`super()` non écrit) n'apparaissent pas : ils n'ont pas de nœud dans l'AST.
+
+
+= Partie B4 : Un outil utilisable et reproductible
+
+== 1 - Ce que demande le sujet
+Une ligne de commande qui reçoit le chemin du projet, l'action et le seuil X ; des cas d'erreur traités sans pile d'exception, avec un code de sortie non nul quand l'analyse est impossible ; une construction reproductible depuis une copie fraîche.
+
+== 2 - Étapes de réalisation
+
+=== Étape 1 : la syntaxe de la ligne de commande
+- *Quoi* : `PROJET ACTION` suivis d'options. Actions : `ast`, `structure`, `appels`, `faits`, `metriques`, `graphe`, `tout`, `menu`. Options : `--x N`, `--fichier`, `--constructeurs`, `--methode`, `--dot`.
+- *Pourquoi* : une action par étape du sujet, ce qui rend chaque point de contrôle reproductible par une seule commande. Le projet et l'action sont obligatoires, donc positionnels ; le reste dépend de l'action, donc en options nommées.
+- *Comment* : la classe `Options` (un record) lit et valide les arguments avant toute analyse. Elle lève `IllegalArgumentException` avec un message explicite. Elle contient aussi le texte d'usage.
+
+=== Étape 2 : le seuil X
+- *Quoi* : `--x N` est obligatoire pour `metriques` et `tout`. Une valeur absente, non entière ou négative est refusée.
+- *Pourquoi* : le § 4.3 impose X sur la ligne de commande et le refus d'une valeur mal formée. Refuser avant l'analyse évite de calculer pour rien.
+- *Comment* : `Options.parseX` est la seule fonction qui valide X. Le menu interactif l'utilise aussi, ce qui garantit la même règle dans les deux modes.
+
+=== Étape 3 : une chaîne d'analyse unique
+- *Quoi* : le record `Analysis` exécute la chaîne une fois (sources, AST, visiteurs, faits) et garde le résultat.
+- *Pourquoi* : auparavant, le menu relançait les visiteurs à chaque option et les tests refaisaient la même séquence. Une seule entrée garantit que toutes les actions lisent les mêmes faits.
+- *Comment* : `Analysis.of(chemin)` trie les fichiers, relève les erreurs de compilation, lance les trois visiteurs et appelle `FactBuilder`.
+
+=== Étape 4 : séparer l'affichage
+- *Quoi* : `ConsoleReport` contient tout l'affichage, une méthode par action. L'ancienne classe `MainCLI` (menu, construction des faits et affichage mêlés) est remplacée par `InteractiveMenu`, qui ne fait qu'appeler `ConsoleReport`.
+- *Pourquoi* : l'indice du sujet demande des composants séparés et testables. `Main` lit les arguments et délègue ; les calculs restent dans `analysis` ; l'affichage ne calcule rien.
+- *Comment* : `ConsoleReport` reçoit le flux de sortie en paramètre. Les tests lui donnent un flux en mémoire et lisent ce qui a été écrit.
+
+=== Étape 5 : les erreurs et les codes de sortie
+#table(
+  columns: (2fr, 2fr, 1fr),
+  stroke: 0.5pt + luma(150),
+  table.header([*Cas*], [*Comportement*], [*Code*]),
+  [Arguments invalides (action inconnue, X absent ou mal formé)], [message et usage], [2],
+  [Dossier introuvable, dossier sans fichier Java], [message], [3],
+  [Fichier qui ne compile pas], [erreurs listées, analyse poursuivie], [0],
+  [Binding non résolu], [appel marqué « non résolue » et compté], [0],
+  [Erreur imprévue], [message d'une ligne, sans pile], [1],
+)
+- *Pourquoi deux codes* : un script appelant peut distinguer une mauvaise commande d'un projet inanalysable.
+- *Comment* : `Main.run` renvoie le code de sortie au lieu d'appeler `System.exit`, ce qui permet de le tester. `main` se réduit à `System.exit(run(...))`. Le contrôle « aucun fichier .java » est dans `ProjectSources.of`.
+- *Erreurs de syntaxe* : `setStatementsRecovery(true)` a été ajouté à `JdtParser`. Sans lui, le corps d'une méthode contenant une erreur est vide et ses appels sont perdus ; avec lui, l'appel `Helper.add` de `Broken.java` est retrouvé.
+
+=== Étape 6 : reproductibilité
+- Les échantillons de robustesse sont copiés dans `src/test/resources/robustness` : les tests ne dépendent plus d'un dossier extérieur au dépôt. Le cas `missing-dep` du test A3, jusque-là sauté en silence, est maintenant exécuté.
+- Vérifié sur une copie du projet sans `target/`, placée dans un dossier dont le nom contient un espace : `mvn clean package` réussit et le JAR s'exécute.
+- Deux exécutions de l'action `tout` donnent une sortie identique.
+
+== 3 - Résultats sur le point de contrôle
+- Chemin inexistant : « Dossier introuvable », code 3.
+- `no-java-files` : « Aucun fichier .java », code 3.
+- `syntax-error` : 2 erreurs signalées dans `Broken.java`, `Helper` analysé, code 0.
+- `--x abc` : « Seuil X invalide », code 2.
+
+== 4 - Validation
+`ControlPointB4Test` appelle `Main.run` avec les arguments de chaque cas et vérifie le code de sortie, le message, l'absence de pile d'exception, le chemin avec espaces, l'application de X et le déterminisme.

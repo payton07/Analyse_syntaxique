@@ -1,0 +1,3 @@
+Ce repertoire ne contient volontairement aucun fichier .java.
+Votre analyseur doit le signaler clairement (message explicite, code de sortie non nul
+ou rapport vide documente) au lieu de lever une exception non geree.

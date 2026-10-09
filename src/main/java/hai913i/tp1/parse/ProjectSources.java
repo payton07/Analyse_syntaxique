@@ -17,7 +17,9 @@ public record ProjectSources(Path projectDirectory, Path sourceRoot, List<Path> 
 
     public static ProjectSources of(Path projectDirectory) throws IOException {
         if (!Files.isDirectory(projectDirectory)) {
-            throw new IllegalArgumentException("Pas un repertoire : " + projectDirectory);
+            throw new IllegalArgumentException(Files.exists(projectDirectory)
+                    ? "Ce n'est pas un dossier : " + projectDirectory
+                    : "Dossier introuvable : " + projectDirectory);
         }
         Path project = projectDirectory.toAbsolutePath().normalize();
         Path root = Stream.of(project.resolve("src/main/java"), project.resolve("src"))
@@ -29,6 +31,9 @@ public record ProjectSources(Path projectDirectory, Path sourceRoot, List<Path> 
                     .filter(p -> p.getFileName().toString().endsWith(".java"))
                     .sorted()
                     .collect(Collectors.toList());
+            if (files.isEmpty()) {
+                throw new IllegalArgumentException("Aucun fichier .java dans : " + root);
+            }
             return new ProjectSources(project, root, files);
         }
     }

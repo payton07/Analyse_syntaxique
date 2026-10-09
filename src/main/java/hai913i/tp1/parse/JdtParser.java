@@ -39,6 +39,8 @@ public final class JdtParser {
         parser.setKind(ASTParser.K_COMPILATION_UNIT);
         parser.setResolveBindings(true);
         parser.setBindingsRecovery(true);
+        // Fichier avec erreur de syntaxe : garder les instructions récupérables du corps des méthodes
+        parser.setStatementsRecovery(true);
 
         // 1. JAR externes du projet analysé (éventuellement aucun)
         // 2. racine des sources
