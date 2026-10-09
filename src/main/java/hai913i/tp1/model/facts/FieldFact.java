@@ -2,7 +2,7 @@ package hai913i.tp1.model.facts;
 
 public record FieldFact(
         String name,
-        String typeQualifiedName,
+        String declaredType,
         String visibility
 ) implements Comparable<FieldFact> {
 
