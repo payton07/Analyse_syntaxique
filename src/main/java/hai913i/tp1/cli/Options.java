@@ -29,12 +29,16 @@ public record Options(
     public static final List<String> ACTIONS =
             List.of("ast", "structure", "appels", "faits", "metriques", "graphe", "tout", "menu", "comparer");
 
+    // Chemin seul, sans action : seul l'en-tête est affiché (commande du point de contrôle A0)
+    public static final String HEADER_ONLY = "en-tete";
+
     public static final String USAGE = """
-            Usage : java -jar target/hai913i-tp1-analyzer.jar PROJET ACTION [options]
+            Usage : java -jar target/hai913i-tp1-analyzer.jar PROJET [ACTION] [options]
 
               PROJET   dossier du projet Java à analyser
 
-              ACTION   ast         arbre syntaxique (A1)            option : --fichier Nom.java
+              ACTION   (aucune)    unités de compilation et erreurs de compilation (A0)
+                       ast         arbre syntaxique (A1)            option : --fichier Nom.java
                        structure   classes, attributs, méthodes (A2)
                        appels      appels et type statique du receveur (A3)
                        faits       comptages relus depuis le modèle de faits (B1)
@@ -72,11 +76,14 @@ public record Options(
      * @throws IllegalArgumentException avec un message explicite si les arguments sont invalides
      */
     public static Options parse(String[] args) {
-        if (args.length < 2) {
-            throw new IllegalArgumentException("Il faut au moins le dossier du projet et une action.");
+        if (args.length < 1) {
+            throw new IllegalArgumentException("Il faut au moins le dossier du projet.");
         }
 
         Path project = Path.of(args[0]);
+        if (args.length == 1) {
+            return new Options(project, HEADER_ONLY, null, null, false, null, null, JDT, null, GraphView.Filter.NONE);
+        }
         String action = args[1];
         if (!ACTIONS.contains(action)) {
             throw new IllegalArgumentException("Action inconnue : « " + action + " ». "

@@ -55,6 +55,9 @@ public final class Main {
 
             report.header();
             switch (options.action()) {
+                case Options.HEADER_ONLY -> {
+                    // A0 : l'en-tête suffit
+                }
                 case "ast" -> report.ast(options.file());
                 case "structure" -> report.structure();
                 case "appels" -> report.calls();

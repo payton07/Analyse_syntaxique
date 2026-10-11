@@ -132,6 +132,20 @@ class ControlPointB4Test {
     // --- Fonctionnement normal ---
 
     @Test
+    @DisplayName("Chemin seul, sans action : l'affichage du point de contrôle A0, et rien d'autre")
+    void testProjectOnlyShowsA0() {
+        Run run = run(VALIDATION);
+        assertAll(
+                () -> assertEquals(Main.EXIT_OK, run.exitCode(), run.err()),
+                () -> assertEquals(3, run.out().lines().count()),
+                () -> assertTrue(run.out().lines().findFirst().orElse("").startsWith("Racine des sources")),
+                () -> assertTrue(run.out().contains("Unites de compilation  : 14")),
+                () -> assertTrue(run.out().contains("Erreurs de compilation : 0"))
+        );
+        assertCleanError(run("dossier/qui/n/existe/pas"), Main.EXIT_ANALYSIS, "Dossier introuvable");
+    }
+
+    @Test
     @DisplayName("Chemin contenant des espaces")
     void testPathWithSpaces(@TempDir Path tempDir) throws IOException {
         Path project = tempDir.resolve("mon projet avec espaces");

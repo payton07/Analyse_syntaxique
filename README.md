@@ -91,8 +91,11 @@ qui contient ses dépendances.
 ## Exécution
 
 ```text
-java -jar target/hai913i-tp1-analyzer.jar PROJET ACTION [options]
+java -jar target/hai913i-tp1-analyzer.jar PROJET [ACTION] [options]
 ```
+
+Sans action, l'outil affiche seulement la racine des sources, le nombre d'unités de compilation et le
+nombre d'erreurs de compilation (point de contrôle A0). Ces trois lignes précèdent aussi chaque action.
 
 | Action | Ce qu'elle affiche | Options |
 |---|---|---|
@@ -129,6 +132,7 @@ aucun fichier Java) ; `1` erreur inattendue.
 ### Exemples
 
 ```text
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation ast --fichier Dvd.java
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation structure
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation appels
@@ -162,7 +166,7 @@ Valeurs attendues sur le projet de validation :
 
 | Étape | Commande (après `PROJET` = `src/test/resources/validation`) | Résultat attendu |
 |---|---|---|
-| A0 | toute action | 14 unités de compilation, 0 erreur |
+| A0 | aucune (le chemin seul) | 14 unités de compilation, 0 erreur |
 | A2 | `structure` | 15 classes : 12 classes, 2 interfaces, 1 énumération ; 59 méthodes, dont 9 constructeurs ; 21 attributs |
 | A3 | `appels` | 94 appels : 46 vers le projet, 48 vers l'extérieur, 0 non résolu |
 | B1 | `faits` | les mêmes nombres, relus depuis le modèle |
