@@ -146,6 +146,64 @@ class ControlPointB4Test {
     }
 
     @Test
+    @DisplayName("structure --fichier : seulement les types déclarés dans ce fichier")
+    void testStructureOfOneFile() {
+        Run dvd = run(VALIDATION, "structure", "--fichier", "Dvd.java");
+        Run loanService = run(VALIDATION, "structure", "--fichier", "LoanService.java");
+        Run withSpoon = run(VALIDATION, "structure", "--fichier", "Dvd.java", "--moteur", "spoon");
+        assertAll(
+                () -> assertEquals(Main.EXIT_OK, dvd.exitCode(), dvd.err()),
+                () -> assertTrue(dvd.out().contains("Classe : library.model.Dvd")),
+                () -> assertFalse(dvd.out().contains("library.model.Book"), "les autres types ne sont pas affichés"),
+                () -> assertTrue(dvd.out().contains("Types déclarés dans Dvd.java : 1")),
+                () -> assertTrue(loanService.out().contains("Classe : library.service.LoanService.Loan"),
+                        "la classe membre est déclarée dans le même fichier"),
+                () -> assertTrue(loanService.out().contains("Types déclarés dans LoanService.java : 2")),
+                () -> assertTrue(withSpoon.out().contains("Classe : library.model.Dvd")),
+                () -> assertFalse(withSpoon.out().contains("library.model.Book")),
+                () -> assertTrue(run(VALIDATION, "structure").out().contains("Classe : library.model.Book"),
+                        "sans --fichier, tout le projet")
+        );
+        assertCleanError(run(VALIDATION, "structure", "--fichier", "Absent.java"), Main.EXIT_ANALYSIS, "Absent.java");
+    }
+
+    // Valeur de la ligne « Total appels     : N » du résumé A3
+    private static int totalCalls(Run run) {
+        return run.out().lines()
+                .filter(line -> line.startsWith("Total appels"))
+                .mapToInt(line -> Integer.parseInt(line.substring(line.indexOf(':') + 1).trim()))
+                .findFirst().orElseThrow();
+    }
+
+    @Test
+    @DisplayName("appels --fichier : seulement les appels écrits dans ce fichier")
+    void testCallsOfOneFile() throws IOException {
+        Run loanService = run(VALIDATION, "appels", "--fichier", "LoanService.java");
+        Run withSpoon = run(VALIDATION, "appels", "--fichier", "LoanService.java", "--moteur", "spoon");
+        assertAll(
+                () -> assertEquals(Main.EXIT_OK, loanService.exitCode(), loanService.err()),
+                () -> assertTrue(loanService.out().contains("APPELS ET RECEVEURS DE LoanService.java (A3)")),
+                () -> assertTrue(loanService.out().contains("Dans library.service.LoanService#borrow(")),
+                () -> assertFalse(loanService.out().contains("Dans library.app.LibraryApp#"),
+                        "les appels des autres fichiers ne sont pas affichés"),
+                () -> assertEquals(94, totalCalls(run(VALIDATION, "appels")), "sans --fichier, tout le projet"),
+                () -> assertEquals(totalCalls(loanService), totalCalls(withSpoon), "même filtre avec Spoon")
+        );
+
+        // Chaque appel est écrit dans un seul fichier : les totaux par fichier redonnent les 94 appels
+        int sum = 0;
+        try (Stream<Path> paths = Files.walk(Path.of(VALIDATION))) {
+            for (Path file : paths.filter(p -> p.toString().endsWith(".java")).toList()) {
+                sum += totalCalls(run(VALIDATION, "appels", "--fichier", file.getFileName().toString()));
+            }
+        }
+        assertEquals(94, sum);
+
+        assertTrue(run(VALIDATION, "appels", "--fichier", "Loanable.java").out().contains("(aucun appel dans ce fichier)"));
+        assertCleanError(run(VALIDATION, "appels", "--fichier", "Absent.java"), Main.EXIT_ANALYSIS, "Absent.java");
+    }
+
+    @Test
     @DisplayName("Chemin contenant des espaces")
     void testPathWithSpaces(@TempDir Path tempDir) throws IOException {
         Path project = tempDir.resolve("mon projet avec espaces");

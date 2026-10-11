@@ -74,7 +74,7 @@ résolue que si le type qui la déclare est dans les sources analysées ou dans 
 | Spoon | 11.5.0 (bonus C1) |
 | JUnit Jupiter | 5.14.4 |
 | Système | macOS 27.0 |
-| IDE | IntelliJ IDEA (version à compléter) ; aucun élément ne dépend de l'IDE |
+| IDE | IntelliJ IDEA 2025.3.2 ; aucun élément ne dépend de l'IDE |
 | Graphviz | 16.1.0 ; facultatif, nécessaire seulement pour l'option `--image` (bonus C2) |
 
 ## Construction
@@ -100,8 +100,8 @@ nombre d'erreurs de compilation (point de contrôle A0). Ces trois lignes préc�
 | Action | Ce qu'elle affiche | Options |
 |---|---|---|
 | `ast` | l'arbre syntaxique (A1) | `--fichier Nom.java` |
-| `structure` | classes, attributs, méthodes, héritage (A2) | |
-| `appels` | appels, type statique du receveur, cible (A3) | |
+| `structure` | classes, attributs, méthodes, héritage (A2) | `--fichier Nom.java` |
+| `appels` | appels, type statique du receveur, cible (A3) | `--fichier Nom.java` |
 | `faits` | les comptages relus depuis le modèle de faits (B1) | |
 | `metriques` | les 13 métriques (B2) | `--x N` obligatoire |
 | `graphe` | le graphe d'appel (B3) et son dessin (C2) | `--constructeurs`, `--methode TEXTE`, `--dot FICHIER`, `--image FICHIER`, `--paquetage NOM`, `--voisinage TEXTE`, `--sans-isoles`, `--par-classe` |
@@ -110,6 +110,8 @@ nombre d'erreurs de compilation (point de contrôle A0). Ces trois lignes préc�
 | `comparer` | comptages bruts de Spoon, et écarts entre les faits de Spoon et ceux de JDT (C1) | |
 
 - `--x N` : seuil X de la question 11, entier positif ou nul.
+- `--fichier Nom.java` : avec `ast`, n'affiche que l'arbre de ce fichier ; avec `structure`, n'affiche que les
+  types déclarés dans ce fichier ; avec `appels`, n'affiche que les appels écrits dans ce fichier.
 - `--methode TEXTE` : appelées et appelantes des méthodes dont la clé contient `TEXTE`.
 - `--dot FICHIER` : écrit le graphe au format DOT.
 - `--image FICHIER` : produit l'image du graphe avec Graphviz. L'extension donne le format : `.svg`, `.png`
@@ -135,7 +137,9 @@ aucun fichier Java) ; `1` erreur inattendue.
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation ast --fichier Dvd.java
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation structure
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation structure --fichier Dvd.java
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation appels
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation appels --fichier LoanService.java
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation metriques --x 5
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --methode Loanable#checkOut
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --constructeurs --dot callgraph.dot

@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import hai913i.tp1.Analysis;
 import hai913i.tp1.analysis.CallGraph;
@@ -21,6 +23,7 @@ import hai913i.tp1.model.facts.TypeFact;
 import hai913i.tp1.model.infos.ClassInfo;
 import hai913i.tp1.parse.JdtParser.ParsedFile;
 import hai913i.tp1.spoon.EngineComparison;
+import hai913i.tp1.visitors.StructureVisitor;
 import hai913i.tp1.visitors.TreeVisitor;
 
 /**
@@ -65,38 +68,73 @@ public class ConsoleReport {
      * @throws IllegalArgumentException si aucun fichier analysé ne porte ce nom
      */
     public void ast(String fileName) {
+        for (ParsedFile file : filesNamed(fileName)) {
+            out.println("\n--- AST de " + file.path().getFileName() + " ---");
+            file.unit().accept(new TreeVisitor(out));
+        }
+    }
+
+    // Fichiers analysés qui portent ce nom (tous si le nom est null)
+    private List<ParsedFile> filesNamed(String fileName) {
         List<ParsedFile> targets = analysis.files().stream()
                 .filter(f -> fileName == null || f.path().getFileName().toString().equalsIgnoreCase(fileName))
                 .toList();
         if (targets.isEmpty()) {
             throw new IllegalArgumentException("Aucun fichier analysé ne s'appelle « " + fileName + " ».");
         }
-        for (ParsedFile file : targets) {
-            out.println("\n--- AST de " + file.path().getFileName() + " ---");
-            file.unit().accept(new TreeVisitor(out));
-        }
+        return targets;
     }
 
     // ------------------------------------------------------------------------
     // A2 : structure
     // ------------------------------------------------------------------------
     public void structure() {
+        structure(null);
+    }
+
+    /**
+     * @param fileName nom d'un fichier (Dvd.java) dont on veut les seuls types, ou null pour tout le projet
+     * @throws IllegalArgumentException si aucun fichier analysé ne porte ce nom
+     */
+    public void structure(String fileName) {
+        // null : aucun filtre. Sinon, les noms qualifiés des types déclarés dans le fichier demandé.
+        Set<String> wanted = fileName == null ? null : typesDeclaredIn(fileName);
+        String scope = fileName == null ? "DU PROJET" : "DE " + fileName;
+
         if (Options.SPOON.equals(analysis.engine())) {
-            structureFromFacts();
-            return;
+            structureFromFacts(scope, wanted);
+        } else {
+            out.println("\n========== STRUCTURE " + scope + " (A2) ==========");
+            for (ClassInfo info : analysis.classes()) {
+                if (wanted == null || wanted.contains(info.qualifiedName)) out.println(info);
+            }
         }
-        out.println("\n========== STRUCTURE DU PROJET (A2) ==========");
-        for (ClassInfo info : analysis.classes()) {
-            out.println(info);
+        if (wanted != null) {
+            out.println("Types déclarés dans " + fileName + " : " + wanted.size());
+        } else if (!Options.SPOON.equals(analysis.engine())) {
+            out.println(analysis.stats());
         }
-        out.println(analysis.stats());
+    }
+
+    // Le visiteur de structure est relancé sur les seuls fichiers demandés : il donne leurs types comptés
+    private Set<String> typesDeclaredIn(String fileName) {
+        StructureVisitor visitor = new StructureVisitor();
+        for (ParsedFile file : filesNamed(fileName)) {
+            file.unit().accept(visitor);
+        }
+        Set<String> names = new TreeSet<>();
+        for (ClassInfo info : visitor.getClasses()) {
+            names.add(info.qualifiedName);
+        }
+        return names;
     }
 
     // Avec Spoon, la structure est relue dans le modèle de faits : ClassInfo est rempli par JDT
-    private void structureFromFacts() {
+    private void structureFromFacts(String scope, Set<String> wanted) {
         ProjectFacts facts = analysis.facts();
-        out.println("\n========== STRUCTURE DU PROJET (A2, extraite avec Spoon) ==========");
+        out.println("\n========== STRUCTURE " + scope + " (A2, extraite avec Spoon) ==========");
         for (TypeFact type : facts.getTypes().values()) {
+            if (wanted != null && !wanted.contains(type.qualifiedName())) continue;
             out.println("==================================================");
             out.printf("%s : %s (package: %s)%n", type.kind(), type.qualifiedName(), type.packageName());
             out.println("Superclasses : " + (type.superClasses().isEmpty() ? "aucune" : String.join(", ", type.superClasses())));
@@ -123,11 +161,22 @@ public class ConsoleReport {
     // A3 : appels et receveurs
     // ------------------------------------------------------------------------
     public void calls() {
+        calls(null);
+    }
+
+    /**
+     * @param fileName nom d'un fichier (LoanService.java) dont on veut les seuls appels, ou null pour tout le projet
+     * @throws IllegalArgumentException si aucun fichier analysé ne porte ce nom
+     */
+    public void calls(String fileName) {
         ProjectFacts facts = analysis.facts();
+        // null : aucun filtre. Sinon, les types déclarés dans le fichier : leurs méthodes sont les appelantes gardées.
+        Set<String> wanted = fileName == null ? null : typesDeclaredIn(fileName);
         int total = 0, internal = 0, external = 0, unresolved = 0;
 
-        out.println("\n========== APPELS ET RECEVEURS (A3) ==========");
+        out.println("\n========== APPELS ET RECEVEURS" + (fileName == null ? "" : " DE " + fileName) + " (A3) ==========");
         for (MethodFact method : facts.getMethods().values()) {
+            if (wanted != null && !wanted.contains(method.declaringType())) continue;
             if (method.calls().isEmpty()) continue;
 
             out.println("\nDans " + method.methodKey() + " :");
@@ -139,6 +188,10 @@ public class ConsoleReport {
                 else if (facts.isInternalMethod(call.resolvedTarget())) internal++;
                 else external++;
             }
+        }
+
+        if (wanted != null && total == 0) {
+            out.println("\n(aucun appel dans ce fichier)");
         }
 
         out.println("\n--- Résumé A3 ---");

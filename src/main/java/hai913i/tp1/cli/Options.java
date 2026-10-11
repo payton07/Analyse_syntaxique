@@ -39,8 +39,8 @@ public record Options(
 
               ACTION   (aucune)    unités de compilation et erreurs de compilation (A0)
                        ast         arbre syntaxique (A1)            option : --fichier Nom.java
-                       structure   classes, attributs, méthodes (A2)
-                       appels      appels et type statique du receveur (A3)
+                       structure   classes, attributs, méthodes (A2) option : --fichier Nom.java
+                       appels      appels et type statique du receveur (A3) option : --fichier Nom.java
                        faits       comptages relus depuis le modèle de faits (B1)
                        metriques   les 13 métriques (B2)            exige  : --x N
                        graphe      graphe d'appel (B3)              options: --constructeurs
@@ -56,7 +56,8 @@ public record Options(
                        comparer    comptages de Spoon et écarts avec JDT (C1)
 
               --x N             seuil X : classes ayant strictement plus de N méthodes (entier >= 0)
-              --fichier NOM     n'afficher que l'AST de ce fichier
+              --fichier NOM     n'afficher que l'AST (ast), les types (structure) ou les appels
+                                (appels) de ce fichier
               --constructeurs   ajouter au graphe les arcs vers les constructeurs
               --methode TEXTE   appelées et appelantes des méthodes dont la clé contient TEXTE
               --dot FICHIER     écrire le graphe au format DOT dans FICHIER

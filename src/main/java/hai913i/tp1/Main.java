@@ -59,8 +59,8 @@ public final class Main {
                     // A0 : l'en-tête suffit
                 }
                 case "ast" -> report.ast(options.file());
-                case "structure" -> report.structure();
-                case "appels" -> report.calls();
+                case "structure" -> report.structure(options.file());
+                case "appels" -> report.calls(options.file());
                 case "faits" -> report.facts();
                 case "metriques" -> report.metrics(options.x());
                 case "graphe" -> report.graph(options.constructorArcs(), options.method(), options.dot(),
