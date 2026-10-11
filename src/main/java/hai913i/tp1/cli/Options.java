@@ -3,6 +3,8 @@ package hai913i.tp1.cli;
 import java.nio.file.Path;
 import java.util.List;
 
+import hai913i.tp1.analysis.GraphView;
+
 /**
  * Arguments de la ligne de commande, lus et validés avant toute analyse.
  *
@@ -15,11 +17,17 @@ public record Options(
         String file,               // --fichier : fichier dont on affiche l'AST
         boolean constructorArcs,   // --constructeurs : arcs vers les constructeurs dans le graphe
         String method,             // --methode : méthode dont on veut les appelées et les appelantes
-        Path dot                   // --dot : fichier DOT à écrire
+        Path dot,                  // --dot : fichier DOT à écrire
+        String engine,             // --moteur : jdt (par défaut) ou spoon
+        Path image,                // --image : image du graphe à produire avec Graphviz
+        GraphView.Filter view      // --paquetage, --voisinage, --sans-isoles, --par-classe
 ) {
 
+    public static final String JDT = "jdt";
+    public static final String SPOON = "spoon";
+
     public static final List<String> ACTIONS =
-            List.of("ast", "structure", "appels", "faits", "metriques", "graphe", "tout", "menu");
+            List.of("ast", "structure", "appels", "faits", "metriques", "graphe", "tout", "menu", "comparer");
 
     public static final String USAGE = """
             Usage : java -jar target/hai913i-tp1-analyzer.jar PROJET ACTION [options]
@@ -34,14 +42,27 @@ public record Options(
                        graphe      graphe d'appel (B3)              options: --constructeurs
                                                                              --methode TEXTE
                                                                              --dot FICHIER
+                                                                             --image FICHIER
+                                                                             --paquetage NOM
+                                                                             --voisinage TEXTE
+                                                                             --sans-isoles
+                                                                             --par-classe
                        tout        structure, appels, métriques et graphe (exige --x N)
                        menu        menu interactif
+                       comparer    comptages de Spoon et écarts avec JDT (C1)
 
               --x N             seuil X : classes ayant strictement plus de N méthodes (entier >= 0)
               --fichier NOM     n'afficher que l'AST de ce fichier
               --constructeurs   ajouter au graphe les arcs vers les constructeurs
               --methode TEXTE   appelées et appelantes des méthodes dont la clé contient TEXTE
               --dot FICHIER     écrire le graphe au format DOT dans FICHIER
+              --image FICHIER   produire l'image du graphe avec Graphviz (.svg, .png ou .pdf)
+              --paquetage NOM   ne dessiner que les méthodes de ce paquetage
+              --voisinage TEXTE ne dessiner que les méthodes dont la clé contient TEXTE,
+                                leurs appelantes et leurs appelées
+              --sans-isoles     ne pas dessiner les méthodes sans aucun arc
+              --par-classe      regrouper les méthodes dans un cadre par classe
+              --moteur NOM      extraire les faits avec jdt (par défaut) ou avec spoon
               -h, --help        afficher cette aide
 
             Exemple : java -jar target/hai913i-tp1-analyzer.jar "../mon projet" metriques --x 5
@@ -67,6 +88,12 @@ public record Options(
         boolean constructorArcs = false;
         String method = null;
         Path dot = null;
+        String engine = JDT;
+        Path image = null;
+        String packageName = null;
+        String focus = null;
+        boolean hideIsolated = false;
+        boolean byClass = false;
 
         for (int i = 2; i < args.length; i++) {
             switch (args[i]) {
@@ -75,6 +102,12 @@ public record Options(
                 case "--constructeurs" -> constructorArcs = true;
                 case "--methode" -> method = valueOf(args, ++i, "--methode");
                 case "--dot" -> dot = Path.of(valueOf(args, ++i, "--dot"));
+                case "--image" -> image = parseImage(valueOf(args, ++i, "--image"));
+                case "--paquetage" -> packageName = valueOf(args, ++i, "--paquetage");
+                case "--voisinage" -> focus = valueOf(args, ++i, "--voisinage");
+                case "--sans-isoles" -> hideIsolated = true;
+                case "--par-classe" -> byClass = true;
+                case "--moteur" -> engine = parseEngine(valueOf(args, ++i, "--moteur"));
                 default -> throw new IllegalArgumentException("Option inconnue : « " + args[i] + " ».");
             }
         }
@@ -84,7 +117,36 @@ public record Options(
                     + " » : ajoutez --x N (entier positif ou nul).");
         }
 
-        return new Options(project, action, x, file, constructorArcs, method, dot);
+        if (engine.equals(SPOON) && action.equals("ast")) {
+            throw new IllegalArgumentException("L'action « ast » affiche l'arbre de JDT : "
+                    + "elle n'existe pas avec --moteur spoon.");
+        }
+
+        GraphView.Filter view = new GraphView.Filter(packageName, focus, hideIsolated, byClass);
+        if (!view.isNone() && dot == null && image == null) {
+            throw new IllegalArgumentException("Les options --paquetage, --voisinage, --sans-isoles et --par-classe "
+                    + "choisissent ce qui est dessiné : ajoutez --dot FICHIER ou --image FICHIER.");
+        }
+
+        return new Options(project, action, x, file, constructorArcs, method, dot, engine, image, view);
+    }
+
+    public static final List<String> IMAGE_FORMATS = List.of("svg", "png", "pdf");
+
+    // Le format de l'image est celui de l'extension du fichier
+    private static Path parseImage(String text) {
+        String extension = text.contains(".") ? text.substring(text.lastIndexOf('.') + 1).toLowerCase() : "";
+        if (!IMAGE_FORMATS.contains(extension)) {
+            throw new IllegalArgumentException("Format d'image inconnu : « " + text + " ». "
+                    + "Extensions possibles : .svg, .png, .pdf.");
+        }
+        return Path.of(text);
+    }
+
+    private static String parseEngine(String text) {
+        String engine = text.trim().toLowerCase();
+        if (engine.equals(JDT) || engine.equals(SPOON)) return engine;
+        throw new IllegalArgumentException("Moteur inconnu : « " + text + " ». Moteurs possibles : jdt, spoon.");
     }
 
     /**

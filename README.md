@@ -2,6 +2,7 @@
 
 Outil en ligne de commande qui lit le code source d'un projet Java, en extrait la structure et les
 appels de méthodes, calcule 13 métriques et construit le graphe d'appel. Il s'appuie sur Eclipse JDT.
+En bonus (partie C1), la même extraction peut être faite avec Spoon et comparée à celle de JDT.
 
 ## Projet
 
@@ -26,21 +27,32 @@ faits → métriques et graphe → affichage.
 | `model.infos` | objets remplis par les visiteurs |
 | `model.facts` | modèle de faits, sans aucune classe JDT |
 | `utils` | `FactBuilder` (construit les faits), `MethodSignatureUtil` (clé d'une méthode) |
-| `analysis` | `MetricsService` (13 métriques), `CallGraph`, `DotExporter` : sur les faits seuls |
-| `report` | `ConsoleReport` : tout l'affichage texte |
+| `spoon` | bonus C1 : `SpoonModel`, `SpoonFactExtractor` (mêmes faits, extraits avec Spoon), `FactComparison`, `EngineComparison` |
+| `analysis` | `MetricsService` (13 métriques), `CallGraph`, `DotExporter`, `GraphView` (bonus C2 : ce qui est dessiné) : sur les faits seuls |
+| `report` | `ConsoleReport` : tout l'affichage texte ; `GraphvizRenderer` (bonus C2) : appelle Graphviz pour produire une image |
 
 ### Dépendances
 
 - Eclipse JDT Core `org.eclipse.jdt:org.eclipse.jdt.core:3.46.0` (analyse) ;
+- Spoon `fr.inria.gforge.spoon:spoon-core:11.5.0` (bonus C1), qui s'appuie sur la même version de JDT ;
+- SLF4J `org.slf4j:slf4j-nop:2.0.18`, pour supprimer l'avertissement de journalisation de Spoon ;
 - JUnit Jupiter 5.14.4 (tests).
 
-Maven les télécharge ; aucun JAR n'est à installer à la main. Spoon n'est pas utilisé.
+Maven les télécharge ; aucun JAR n'est à installer à la main.
 
 ### Approche JDT
 
 `ASTParser` analyse tous les fichiers en un seul lot, avec résolution des bindings, pour que les
 appels d'un fichier vers un autre soient résolus. Les superclasses, le type statique du receveur et
 la cible d'un appel viennent des bindings ; les membres d'un type sont lus dans `bodyDeclarations()`.
+
+### Approche Spoon (bonus C1)
+
+`SpoonFactExtractor` remplit le même modèle de faits que la chaîne JDT, à partir du modèle construit
+par le `Launcher` de Spoon en mode `noClasspath`. Il applique les conventions du sujet, que Spoon ne
+suit pas : constructeurs par défaut et appels `super()` implicites écartés, constantes d'énumération
+non comptées comme attributs, types imbriqués nommés avec un point. Une cible d'appel n'est déclarée
+résolue que si le type qui la déclare est dans les sources analysées ou dans le JDK.
 
 ### Limites connues
 
@@ -59,10 +71,11 @@ la cible d'un appel viennent des bindings ; les membres d'un type sont lus dans 
 | JDK | OpenJDK Temurin 21.0.5 (Java 17 au minimum) |
 | Maven | 3.9.9 |
 | Eclipse JDT Core | 3.46.0 |
+| Spoon | 11.5.0 (bonus C1) |
 | JUnit Jupiter | 5.14.4 |
 | Système | macOS 27.0 |
 | IDE | IntelliJ IDEA (version à compléter) ; aucun élément ne dépend de l'IDE |
-| Graphviz | facultatif, pour convertir le fichier DOT en image (version à compléter si utilisé) |
+| Graphviz | 16.1.0 ; facultatif, nécessaire seulement pour l'option `--image` (bonus C2) |
 
 ## Construction
 
@@ -88,13 +101,26 @@ java -jar target/hai913i-tp1-analyzer.jar PROJET ACTION [options]
 | `appels` | appels, type statique du receveur, cible (A3) | |
 | `faits` | les comptages relus depuis le modèle de faits (B1) | |
 | `metriques` | les 13 métriques (B2) | `--x N` obligatoire |
-| `graphe` | le graphe d'appel (B3) | `--constructeurs`, `--methode TEXTE`, `--dot FICHIER` |
+| `graphe` | le graphe d'appel (B3) et son dessin (C2) | `--constructeurs`, `--methode TEXTE`, `--dot FICHIER`, `--image FICHIER`, `--paquetage NOM`, `--voisinage TEXTE`, `--sans-isoles`, `--par-classe` |
 | `tout` | structure, appels, métriques et graphe | `--x N` obligatoire |
 | `menu` | un menu interactif donnant accès aux mêmes affichages | |
+| `comparer` | comptages bruts de Spoon, et écarts entre les faits de Spoon et ceux de JDT (C1) | |
 
 - `--x N` : seuil X de la question 11, entier positif ou nul.
 - `--methode TEXTE` : appelées et appelantes des méthodes dont la clé contient `TEXTE`.
 - `--dot FICHIER` : écrit le graphe au format DOT.
+- `--image FICHIER` : produit l'image du graphe avec Graphviz. L'extension donne le format : `.svg`, `.png`
+  ou `.pdf`.
+- `--paquetage NOM` : ne dessine que les méthodes de ce paquetage et les arcs entre elles.
+- `--voisinage TEXTE` : ne dessine que les méthodes dont la clé contient `TEXTE`, leurs appelantes et leurs
+  appelées.
+- `--sans-isoles` : ne dessine pas les méthodes sans aucun arc.
+- `--par-classe` : regroupe les méthodes dans un cadre par classe, coloré selon le paquetage.
+
+Ces quatre dernières options choisissent ce qui est dessiné dans le fichier DOT et dans l'image ; elles
+exigent `--dot` ou `--image`. Elles ne changent ni les compteurs ni la liste des arcs affichés.
+- `--moteur jdt` ou `--moteur spoon` : analyseur qui remplit le modèle de faits (`jdt` par défaut). Vaut pour
+  toutes les actions sauf `ast`, qui affiche l'arbre de JDT.
 - `-h` ou `--help` : affiche l'aide.
 
 Codes de sortie : `0` succès ; `2` arguments invalides ; `3` analyse impossible (dossier introuvable,
@@ -110,13 +136,19 @@ java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation metrique
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --methode Loanable#checkOut
 java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --constructeurs --dot callgraph.dot
 java -jar target/hai913i-tp1-analyzer.jar "/chemin/avec des espaces/projet" tout --x 4
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation comparer
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --moteur spoon
 ```
 
-Conversion du fichier DOT en image, si Graphviz est installé :
+Images du graphe (bonus C2), si Graphviz est installé :
 
 ```text
-dot -Tsvg callgraph.dot -o callgraph.svg
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --par-classe --sans-isoles --image graphe.svg
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --voisinage "LoanService#borrow" --par-classe --image voisinage.png
+java -jar target/hai913i-tp1-analyzer.jar src/test/resources/validation graphe --paquetage library.service --par-classe --dot service.dot
 ```
+
+Un fichier DOT peut aussi être converti à la main : `dot -Tsvg callgraph.dot -o callgraph.svg`.
 
 ## Validation
 
@@ -124,7 +156,7 @@ Le projet de validation du sujet est copié dans `src/test/resources/validation`
 de robustesse dans `src/test/resources/robustness`.
 
 `mvn clean test` rejoue tous les points de contrôle ; chaque classe de test porte le nom de son étape
-(`ParserSmokeTest` pour A0, puis `ControlPointA1Test` à `ControlPointB4Test`).
+(`ParserSmokeTest` pour A0, puis `ControlPointA1Test` à `ControlPointB4Test`, puis `ControlPointC1Test` et `ControlPointC2Test`).
 
 Valeurs attendues sur le projet de validation :
 
@@ -137,6 +169,10 @@ Valeurs attendues sur le projet de validation :
 | B2 | `metriques --x 5` | 15 classes, 493 lignes, 59 méthodes, 4 paquetages ; 3,93 ; 4,64 ; 1,40 ; 3 classes pour X = 5 |
 | B3 | `graphe` | 59 nœuds, 44 arcs, 46 sites internes, 48 externes, 0 non résolu |
 | B3 | `graphe --constructeurs` | 52 arcs, 56 sites |
+| C1 | `comparer` | Spoon brut : 14 ou 15 types, 50 méthodes et 13 constructeurs, 24 attributs, 6 paquetages, 107 appels ; 0 écart entre les deux modèles de faits |
+| C1 | `graphe --moteur spoon` | 59 nœuds, 44 arcs, 46 sites, comme avec JDT |
+| C2 | `graphe --par-classe --sans-isoles --image graphe.svg` | « Vue dessinée : 36 nœuds sur 59, 44 arcs sur 44 », et le fichier `graphe.svg` |
+| C2 | `graphe --voisinage "LoanService#borrow" --image v.svg` | « Vue dessinée : 9 nœuds sur 59, 8 arcs sur 44 » |
 
 Robustesse (B4) :
 
@@ -158,4 +194,4 @@ Robustesse (B4) :
 | `Le seuil X est obligatoire` | ajouter `--x N` aux actions `metriques` et `tout` |
 | Beaucoup d'appels « non résolue » | le projet analysé dépend de bibliothèques qui ne sont pas fournies au parseur |
 | Accents illisibles sous Windows | lancer avec `java -Dstdout.encoding=UTF-8 -jar ...` |
-| `dot: command not found` | Graphviz n'est pas installé ; le fichier DOT reste lisible comme texte |
+| `Graphviz est introuvable` | Graphviz n'est pas installé ou n'est pas dans le `PATH` : l'installer, ou remplacer `--image` par `--dot` |

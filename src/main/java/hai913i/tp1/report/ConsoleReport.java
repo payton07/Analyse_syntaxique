@@ -11,13 +11,16 @@ import java.util.Map;
 import hai913i.tp1.Analysis;
 import hai913i.tp1.analysis.CallGraph;
 import hai913i.tp1.analysis.DotExporter;
+import hai913i.tp1.analysis.GraphView;
 import hai913i.tp1.analysis.MetricsService;
+import hai913i.tp1.cli.Options;
 import hai913i.tp1.model.facts.CallFact;
 import hai913i.tp1.model.facts.MethodFact;
 import hai913i.tp1.model.facts.ProjectFacts;
 import hai913i.tp1.model.facts.TypeFact;
 import hai913i.tp1.model.infos.ClassInfo;
 import hai913i.tp1.parse.JdtParser.ParsedFile;
+import hai913i.tp1.spoon.EngineComparison;
 import hai913i.tp1.visitors.TreeVisitor;
 
 /**
@@ -42,6 +45,9 @@ public class ConsoleReport {
     public void header() {
         out.println("Racine des sources     : " + analysis.sources().sourceRoot());
         out.println("Unites de compilation  : " + analysis.files().size());
+        if (Options.SPOON.equals(analysis.engine())) {
+            out.println("Moteur d'extraction    : Spoon (les faits ne viennent pas de JDT)");
+        }
         out.println("Erreurs de compilation : " + analysis.compileErrors().size());
         for (String error : analysis.compileErrors()) {
             out.println("  " + error);
@@ -75,11 +81,42 @@ public class ConsoleReport {
     // A2 : structure
     // ------------------------------------------------------------------------
     public void structure() {
+        if (Options.SPOON.equals(analysis.engine())) {
+            structureFromFacts();
+            return;
+        }
         out.println("\n========== STRUCTURE DU PROJET (A2) ==========");
         for (ClassInfo info : analysis.classes()) {
             out.println(info);
         }
         out.println(analysis.stats());
+    }
+
+    // Avec Spoon, la structure est relue dans le modèle de faits : ClassInfo est rempli par JDT
+    private void structureFromFacts() {
+        ProjectFacts facts = analysis.facts();
+        out.println("\n========== STRUCTURE DU PROJET (A2, extraite avec Spoon) ==========");
+        for (TypeFact type : facts.getTypes().values()) {
+            out.println("==================================================");
+            out.printf("%s : %s (package: %s)%n", type.kind(), type.qualifiedName(), type.packageName());
+            out.println("Superclasses : " + (type.superClasses().isEmpty() ? "aucune" : String.join(", ", type.superClasses())));
+            out.println("Interfaces directes : " + (type.interfaces().isEmpty() ? "aucune" : String.join(", ", type.interfaces())));
+            out.printf("Attributs (%d) :%n", type.getFieldCount());
+            type.fields().forEach(f -> out.printf("  - Attribut: %s %s [visibilité: %s]%n",
+                    f.declaredType(), f.name(), f.visibility()));
+            out.printf("Méthodes (%d) :%n", type.getMethodCount());
+            for (String key : type.methodKeys()) {
+                MethodFact method = facts.getMethods().get(key);
+                out.printf("  - %s: %s (paramètres: %d)%n", method.isConstructor() ? "Constructeur" : "Méthode",
+                        method.isConstructor() ? simpleName(type.qualifiedName()) : method.simpleName(),
+                        method.parameterCount());
+            }
+            out.println();
+        }
+    }
+
+    private static String simpleName(String qualifiedName) {
+        return qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1);
     }
 
     // ------------------------------------------------------------------------
@@ -228,6 +265,15 @@ public class ConsoleReport {
      * @param dotFile        fichier DOT à écrire, ou null
      */
     public void graph(boolean constructorArcs, String methodFragment, Path dotFile) throws IOException {
+        graph(constructorArcs, methodFragment, dotFile, null, GraphView.Filter.NONE);
+    }
+
+    /**
+     * @param imageFile image à produire avec Graphviz, ou null
+     * @param filter    ce qui est dessiné dans le fichier DOT et dans l'image (C2)
+     */
+    public void graph(boolean constructorArcs, String methodFragment, Path dotFile,
+                      Path imageFile, GraphView.Filter filter) throws IOException {
         CallGraph graph = new CallGraph(analysis.facts(), constructorArcs);
         List<CallGraph.Edge> edges = graph.getEdges();
 
@@ -247,10 +293,81 @@ public class ConsoleReport {
         if (methodFragment != null) {
             callersAndCallees(graph, methodFragment);
         }
+        if (dotFile != null || imageFile != null) {
+            draw(graph, dotFile, imageFile, filter);
+        }
+    }
+
+    // C2 : sans filtre, le fichier DOT est celui de B3 ; sinon on dessine une vue du graphe
+    private void draw(CallGraph graph, Path dotFile, Path imageFile, GraphView.Filter filter) throws IOException {
+        String dot;
+        if (filter.isNone()) {
+            dot = DotExporter.export(graph);
+        } else {
+            GraphView view = GraphView.of(graph, analysis.facts(), filter);
+            dot = DotExporter.export(view, analysis.facts());
+            out.printf("%nVue dessinée : %d nœuds sur %d, %d arcs sur %d%n", view.nodes().size(),
+                    graph.getNodes().size(), view.edges().size(), graph.getEdges().size());
+        }
         if (dotFile != null) {
-            Files.writeString(dotFile, DotExporter.export(graph));
+            Files.writeString(dotFile, dot);
             out.println("\nGraphe écrit dans " + dotFile.toAbsolutePath());
         }
+        if (imageFile != null) {
+            GraphvizRenderer.render(dot, imageFile);
+            out.println("\nImage écrite dans " + imageFile.toAbsolutePath());
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // C1 : Spoon brut, Spoon avec les conventions du sujet, JDT
+    // ------------------------------------------------------------------------
+    public void compare() throws IOException {
+        Analysis jdtAnalysis = Options.JDT.equals(analysis.engine())
+                ? analysis : Analysis.of(analysis.sources().projectDirectory());
+        ProjectFacts jdt = jdtAnalysis.facts();
+        EngineComparison comparison = EngineComparison.of(analysis.sources(), jdt);
+        ProjectFacts spoon = comparison.spoonFacts();
+        EngineComparison.RawCounts raw = comparison.raw();
+
+        out.println("\n========== COMPARAISON JDT / SPOON (C1) ==========");
+        final String format = "%-26s | %-30s | %-19s | %s%n";
+        out.printf(format, "Mesure", "Spoon brut", "Spoon + conventions", "JDT");
+        out.println("-".repeat(92));
+        out.printf(format, "Types",
+                raw.topLevelTypes() + " (premier niveau), " + raw.allTypes(),
+                spoon.getTypes().size(), jdt.getTypes().size());
+        out.printf(format, "Méthodes",
+                raw.methods() + " + " + raw.constructors() + " constr. (" + raw.implicitConstructors() + " impl.)",
+                spoon.getMethods().size(), jdt.getMethods().size());
+        out.printf(format, "Attributs",
+                raw.fields() + " (" + raw.enumValues() + " constantes d'enum)",
+                fieldCount(spoon), fieldCount(jdt));
+        out.printf(format, "Paquetages", raw.packages(), spoon.getPackages().size(), jdt.getPackages().size());
+        out.printf(format, "Appels",
+                raw.invocations() + " (" + raw.constructorInvocations() + " constr., "
+                        + raw.implicitInvocations() + " impl.)",
+                spoon.getAllCalls().size(), jdt.getAllCalls().size());
+        out.printf(format, "Graphe (nœuds/arcs/sites)", "-",
+                graphSummary(new CallGraph(spoon, false)), graphSummary(new CallGraph(jdt, false)));
+
+        out.println("\nCibles proposées par Spoon pour un type non vérifié (mode noClasspath) : "
+                + comparison.guessedTargets().size());
+        comparison.guessedTargets().forEach(g -> out.println("  " + g));
+
+        out.println("\nÉcarts entre les deux modèles de faits : " + comparison.differences().size());
+        comparison.differences().forEach(d -> out.println("  " + d));
+        if (comparison.differences().isEmpty()) {
+            out.println("  (aucun : mêmes types, attributs, méthodes et appels)");
+        }
+    }
+
+    private static int fieldCount(ProjectFacts facts) {
+        return facts.getTypes().values().stream().mapToInt(TypeFact::getFieldCount).sum();
+    }
+
+    private static String graphSummary(CallGraph graph) {
+        return graph.getNodes().size() + " / " + graph.getEdges().size() + " / " + graph.getInternalCallSites();
     }
 
     private void callersAndCallees(CallGraph graph, String fragment) {

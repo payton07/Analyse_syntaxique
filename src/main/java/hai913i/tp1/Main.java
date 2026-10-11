@@ -50,7 +50,7 @@ public final class Main {
 
         // 2. Analyse, puis 3. affichage de l'action demandée
         try {
-            Analysis analysis = Analysis.of(options.project());
+            Analysis analysis = Analysis.of(options.project(), options.engine());
             ConsoleReport report = new ConsoleReport(analysis, out);
 
             report.header();
@@ -60,14 +60,17 @@ public final class Main {
                 case "appels" -> report.calls();
                 case "faits" -> report.facts();
                 case "metriques" -> report.metrics(options.x());
-                case "graphe" -> report.graph(options.constructorArcs(), options.method(), options.dot());
+                case "graphe" -> report.graph(options.constructorArcs(), options.method(), options.dot(),
+                        options.image(), options.view());
                 case "tout" -> {
                     report.structure();
                     report.calls();
                     report.metrics(options.x());
-                    report.graph(options.constructorArcs(), options.method(), options.dot());
+                    report.graph(options.constructorArcs(), options.method(), options.dot(),
+                            options.image(), options.view());
                 }
                 case "menu" -> new InteractiveMenu(report, out).start();
+                case "comparer" -> report.compare();
                 default -> throw new IllegalStateException("Action non traitée : " + options.action());
             }
             return EXIT_OK;

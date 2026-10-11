@@ -9,11 +9,13 @@ import java.util.List;
 import org.eclipse.jdt.core.compiler.IProblem;
 
 import hai913i.tp1.analysis.ProjectStats;
+import hai913i.tp1.cli.Options;
 import hai913i.tp1.model.facts.ProjectFacts;
 import hai913i.tp1.model.infos.ClassInfo;
 import hai913i.tp1.parse.JdtParser;
 import hai913i.tp1.parse.JdtParser.ParsedFile;
 import hai913i.tp1.parse.ProjectSources;
+import hai913i.tp1.spoon.SpoonFactExtractor;
 import hai913i.tp1.utils.FactBuilder;
 import hai913i.tp1.visitors.CallExtractorVisitor;
 import hai913i.tp1.visitors.MetricsVisitor;
@@ -31,13 +33,23 @@ public record Analysis(
         List<String> compileErrors,   // « Fichier.java:ligne message », une entrée par erreur
         List<ClassInfo> classes,      // structure détaillée (A2), triée par nom qualifié
         ProjectStats stats,           // comptages bruts (A2)
-        ProjectFacts facts            // modèle de faits indépendant de JDT (B1)
+        ProjectFacts facts,           // modèle de faits indépendant de JDT (B1)
+        String engine                 // analyseur qui a rempli le modèle de faits : jdt ou spoon
 ) {
 
     /**
      * @throws IllegalArgumentException si le dossier n'existe pas ou ne contient aucun fichier .java
      */
     public static Analysis of(Path project) throws IOException {
+        return of(project, Options.JDT);
+    }
+
+    /**
+     * @param engine Options.JDT ou Options.SPOON : l'analyseur qui remplit le modèle de faits (C1).
+     *               Les fichiers, les erreurs de compilation et l'arbre viennent toujours de JDT.
+     * @throws IllegalArgumentException si le dossier n'existe pas ou ne contient aucun fichier .java
+     */
+    public static Analysis of(Path project, String engine) throws IOException {
         ProjectSources sources = ProjectSources.of(project);
 
         // Ordre des fichiers fixé : la sortie ne dépend pas de l'ordre de rappel du parseur
@@ -67,7 +79,9 @@ public record Analysis(
         List<ClassInfo> classes = new ArrayList<>(structVisitor.getClasses());
         classes.sort(Comparator.comparing(c -> c.qualifiedName));
 
-        ProjectFacts facts = FactBuilder.build(files, structVisitor, callVisitor);
-        return new Analysis(sources, files, compileErrors, classes, metricsVisitor.getStats(), facts);
+        ProjectFacts facts = Options.SPOON.equals(engine)
+                ? SpoonFactExtractor.extract(sources)
+                : FactBuilder.build(files, structVisitor, callVisitor);
+        return new Analysis(sources, files, compileErrors, classes, metricsVisitor.getStats(), facts, engine);
     }
 }
